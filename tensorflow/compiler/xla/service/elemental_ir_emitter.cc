@@ -1459,6 +1459,14 @@ StatusOr<llvm::Value*> ElementalIrEmitter::EmitFloatBinaryOp(
         lhs_value = EmitBF16ToF32(lhs_value, b_);
         rhs_value = EmitBF16ToF32(rhs_value, b_);
       }
+      if (operand_type == F8E4M3FNUZ) {
+        lhs_value = EmitF8e4m3fnuzToF16(lhs_value, b_, module_);
+        rhs_value = EmitF8e4m3fnuzToF16(rhs_value, b_, module_);
+      }
+      if (operand_type == F8E5M2FNUZ) {
+        lhs_value = EmitF8e5m2fnuzToF16(lhs_value, b_, module_);
+        rhs_value = EmitF8e5m2fnuzToF16(rhs_value, b_, module_);
+      }
       switch (op->comparison_direction()) {
         case ComparisonDirection::kEq:
           return llvm_ir::EmitComparison(llvm::CmpInst::FCMP_OEQ, lhs_value,
