@@ -108,6 +108,8 @@ PYBIND11_MODULE(xla_extension, m) {
   CHECK(tsl::RegisterNumpyBfloat16());
   CHECK(tsl::RegisterNumpyFloat8e4m3fn());
   CHECK(tsl::RegisterNumpyFloat8e5m2());
+  CHECK(tsl::RegisterNumpyFloat8e4m3fnuz());
+  CHECK(tsl::RegisterNumpyFloat8e5m2fnuz());
 
   // Exceptions
   py::register_exception<XlaRuntimeError>(m, "XlaRuntimeError",
@@ -135,13 +137,17 @@ PYBIND11_MODULE(xla_extension, m) {
       .value("C128", C128)
       .value("TUPLE", TUPLE)
       .value("OPAQUE_TYPE", OPAQUE_TYPE)
-      .value("TOKEN", TOKEN);
+      .value("TOKEN", TOKEN)
+      .value("F8E4M3FNUZ", F8E4M3FNUZ)
+      .value("F8E5M2FNUZ", F8E5M2FNUZ);
 
   m.def("bfloat16_dtype", []() { return py::handle(tsl::Bfloat16Dtype()); });
   m.def("float8_e4m3fn_dtype",
         []() { return py::handle(tsl::Float8e4m3fnDtype()); });
   m.def("float8_e5m2_dtype",
         []() { return py::handle(tsl::Float8e5m2Dtype()); });
+  m.def("float8_e4m3fnuz_dtype", []() { return py::handle(tsl::Float8e4m3fnuzDtype()); });
+  m.def("float8_e5m2fnuz_dtype", []() { return py::handle(tsl::Float8e5m2fnuzDtype()); });
 
   // Must be before PyClient.compile.
   BuildXlaCompilerSubmodule(m);

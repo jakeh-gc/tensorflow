@@ -19,29 +19,20 @@ limitations under the License.
 #include "tensorflow/compiler/xla/hlo/ir/hlo_module.h"
 #include "tensorflow/compiler/xla/service/bfloat16_support.h"
 #include "tensorflow/compiler/xla/service/hlo_pass_interface.h"
+#include "tensorflow/compiler/xla/service/type_normalization.h"
 
 namespace xla {
 
 // A pass which adds F32 <-> BF16 conversions for HLO instructions that do not
 // support BF16 input/output or mixed precision, according to the passed-in
 // backend-specific BF16 support rules.
-class BFloat16Normalization : public HloModulePass {
+class BFloat16Normalization : public TypeNormalization {
  public:
   explicit BFloat16Normalization(const BFloat16Support* bfloat16_support)
-      : bfloat16_support_(bfloat16_support) {}
+      : TypeNormalization(BF16, F32, bfloat16_support) {}
 
   ~BFloat16Normalization() override = default;
   absl::string_view name() const override { return "bf16-normalization"; }
-
-  // Run BF16 normalization on the given computation. Returns whether the
-  // computation was changed.
-  using HloPassInterface::Run;
-  StatusOr<bool> Run(
-      HloModule* module,
-      const absl::flat_hash_set<absl::string_view>& execution_threads) override;
-
- private:
-  const BFloat16Support* bfloat16_support_;
 };
 
 // A pass that unconditionally removes the mixed F32/BF16 uses in HLO
@@ -79,12 +70,12 @@ class BFloat16MixedPrecisionRemoval : public HloModulePass {
 
     ~BFloat16SupportForMixedPrecisionRemoval() override = default;
 
-    bool SupportsBF16Operand(const HloInstruction& hlo,
+    bool SupportsOperand(const HloInstruction& hlo,
                              int64_t operand_index) const override {
       return true;
     }
 
-    bool SupportsBF16Output(const HloInstruction& hlo) const override {
+    bool SupportsOutput(const HloInstruction& hlo) const override {
       return true;
     }
 

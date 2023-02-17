@@ -123,7 +123,7 @@ Status BFloat16ConversionFoldingVisitor::TryFoldBF16Conversions(
     if (operand->shape().element_type() == F32) {
       if (operand->opcode() == HloOpcode::kConvert &&
           operand->operand(0)->shape().element_type() == BF16 &&
-          bfloat16_support_->SupportsBF16Operand(*hlo, i)) {
+          bfloat16_support_->SupportsOperand(*hlo, i)) {
         // Operand is a convert from BF16 to F32 and we support BF16 input
         // directly in the current HLO at the operand index.
         bf16_to_f32_operands.push_back(i);
@@ -136,7 +136,7 @@ Status BFloat16ConversionFoldingVisitor::TryFoldBF16Conversions(
 
   const bool fold_output_conversion =
       AllUsersAreF32ToBF16Converts(hlo) &&
-      bfloat16_support_->SupportsBF16Output(*hlo);
+      bfloat16_support_->SupportsOutput(*hlo);
 
   if (!bfloat16_support_->SupportsMixedPrecisions(*hlo)) {
     if (has_other_f32_operands ||

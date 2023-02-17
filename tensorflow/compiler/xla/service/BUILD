@@ -246,6 +246,16 @@ cc_library(
     srcs = ["bfloat16_support.cc"],
     hdrs = ["bfloat16_support.h"],
     deps = [
+        ":type_support",
+        "//tensorflow/compiler/xla/hlo/ir:hlo",
+    ],
+)
+
+cc_library(
+    name = "type_support",
+    srcs = ["type_support.cc"],
+    hdrs = ["type_support.h"],
+    deps = [
         "//tensorflow/compiler/xla/hlo/ir:hlo",
     ],
 )
@@ -310,14 +320,33 @@ xla_cc_test(
 )
 
 cc_library(
+    name = "type_normalization",
+    srcs = ["type_normalization.cc"],
+    hdrs = ["type_normalization.h"],
+    deps = [
+        ":type_support",
+        ":hlo_dce",
+        ":hlo_pass",
+        ":tuple_simplifier",
+        "//tensorflow/compiler/xla:shape_util",
+        "//tensorflow/compiler/xla:status_macros",
+        "//tensorflow/compiler/xla:xla_data_proto_cc",
+        "//tensorflow/compiler/xla/hlo/ir:hlo",
+        "//tensorflow/tsl/platform:errors",
+        "//tensorflow/tsl/platform:logging",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
     name = "bfloat16_normalization",
-    srcs = ["bfloat16_normalization.cc"],
     hdrs = ["bfloat16_normalization.h"],
     deps = [
         ":bfloat16_support",
         ":hlo_dce",
         ":hlo_pass",
         ":tuple_simplifier",
+        ":type_normalization",
         "//tensorflow/compiler/xla:shape_util",
         "//tensorflow/compiler/xla:status_macros",
         "//tensorflow/compiler/xla:xla_data_proto_cc",

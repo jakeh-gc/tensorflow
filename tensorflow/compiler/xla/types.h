@@ -19,6 +19,7 @@ limitations under the License.
 #include <complex>
 
 #include "third_party/eigen3/Eigen/Core"
+#include "tensorflow/tsl/platform/float8.h"
 
 namespace xla {
 
@@ -27,6 +28,9 @@ using ::Eigen::half;      // NOLINT(misc-unused-using-decls)
 
 using complex64 = std::complex<float>;
 using complex128 = std::complex<double>;
+
+using float8_e4m3fnuz = tsl::float8_e4m3fnuz;
+using float8_e5m2fnuz = tsl::float8_e5m2fnuz;
 
 }  // namespace xla
 

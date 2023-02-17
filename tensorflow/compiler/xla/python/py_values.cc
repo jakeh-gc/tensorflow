@@ -168,6 +168,14 @@ StatusOr<DevicePutResult> HandleNumpyScalar(py::handle h,
     // For extension types, ScalarAsCtype returns a pointer to the data.
     PyArray_ScalarAsCtype(h.ptr(), &ptr);
     type = F8E5M2;
+  } else if (std::is_same<T, tsl::float8_e4m3fnuz>()) {
+    // For extension types, ScalarAsCtype returns a pointer to the data.
+    PyArray_ScalarAsCtype(h.ptr(), &ptr);
+    type = F8E4M3FNUZ;
+  } else if (std::is_same<T, tsl::float8_e5m2fnuz>()) {
+    // For extension types, ScalarAsCtype returns a pointer to the data.
+    PyArray_ScalarAsCtype(h.ptr(), &ptr);
+    type = F8E5M2FNUZ;
   } else if (std::is_same<T, SquashedT>() || !options.squash_64bit_types) {
     PyArray_ScalarAsCtype(h.ptr(), &data);
     ptr = &data;
@@ -397,6 +405,10 @@ StatusOr<DevicePutResult> DevicePut(py::handle arg,
         (*p)[dtypes.np_float8_e4m3fn.ptr()] =
             HandleNumpyScalar<tsl::float8_e4m3fn>;
         (*p)[dtypes.np_float8_e5m2.ptr()] = HandleNumpyScalar<tsl::float8_e5m2>;
+        (*p)[dtypes.np_float8_e4m3fnuz.ptr()] =
+            HandleNumpyScalar<tsl::float8_e4m3fnuz>;
+        (*p)[dtypes.np_float8_e5m2fnuz.ptr()] =
+            HandleNumpyScalar<tsl::float8_e5m2fnuz>;
         (*p)[dtypes.np_bfloat16.ptr()] = HandleNumpyScalar<bfloat16>;
         (*p)[dtypes.np_float16.ptr()] = HandleNumpyScalar<half>;
         (*p)[dtypes.np_float32.ptr()] = HandleNumpyScalar<float>;
@@ -614,6 +626,8 @@ StatusOr<PyArgSignature> PyArgSignatureOfValue(py::handle arg,
         (*p)[dtypes.np_uint64.ptr()] = np_uint64_handler;
         (*p)[dtypes.np_float8_e4m3fn.ptr()] = numpy_array_handler;
         (*p)[dtypes.np_float8_e5m2.ptr()] = numpy_array_handler;
+        (*p)[dtypes.np_float8_e4m3fnuz.ptr()] = numpy_array_handler;
+        (*p)[dtypes.np_float8_e5m2fnuz.ptr()] = numpy_array_handler;
         (*p)[dtypes.np_float16.ptr()] = numpy_array_handler;
         (*p)[dtypes.np_bfloat16.ptr()] = numpy_array_handler;
         (*p)[dtypes.np_float32.ptr()] = numpy_array_handler;

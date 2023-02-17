@@ -423,7 +423,7 @@ void BFloat16Propagation::DetermineInstructionPrecision(HloInstruction* hlo,
     return;
   }
 
-  if (!bfloat16_support_->SupportsBF16Output(*hlo)) {
+  if (!bfloat16_support_->SupportsOutput(*hlo)) {
     return;
   }
 

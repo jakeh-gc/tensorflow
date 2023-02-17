@@ -19,10 +19,18 @@ limitations under the License.
 PYBIND11_MODULE(_pywrap_float8, m) {
   tsl::RegisterNumpyFloat8e4m3fn();
   tsl::RegisterNumpyFloat8e5m2();
+  tsl::RegisterNumpyFloat8e4m3fzn();
+  tsl::RegisterNumpyFloat8e5m2fnuz();
 
   m.def("TF_float8_e4m3fn_type",
         [] { return pybind11::handle(tsl::Float8e4m3fnDtype()); });
 
   m.def("TF_float8_e5m2_type",
         [] { return pybind11::handle(tsl::Float8e5m2Dtype()); });
+
+  m.def("TF_float8_e4m3fnuz_type",
+        [] { return pybind11::handle(tsl::Float8e4m3fznDtype()); });
+
+  m.def("TF_float8_e5m2fnuz_type",
+        [] { return pybind11::handle(tsl::Float8e5m2fnuzDtype()); });
 }

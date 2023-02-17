@@ -162,6 +162,8 @@ llvm::Type* PrimitiveTypeToIrType(PrimitiveType element_type,
       return llvm::Type::getInt16Ty(module->getContext());
     case F8E5M2:
     case F8E4M3FN:
+    case F8E5M2FNUZ:
+    case F8E4M3FNUZ:
       // Similarly as with BF16, we represent F8 as an int since there is no
       // LLVM F8 dtype.
       return llvm::Type::getInt8Ty(module->getContext());

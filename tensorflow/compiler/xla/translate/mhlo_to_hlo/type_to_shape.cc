@@ -48,6 +48,10 @@ PrimitiveType TypeToPrimitiveType(mlir::Type type) {
     return PrimitiveType::F8E5M2;
   } else if (type.isFloat8E4M3FN()) {
     return PrimitiveType::F8E4M3FN;
+  } else if (type.isFloat8E5M2FNUZ()) {
+    return PrimitiveType::F8E5M2FNUZ;
+  } else if (type.isFloat8E4M3FNUZ()) {
+    return PrimitiveType::F8E4M3FNUZ;
   } else if (type.isBF16()) {
     return PrimitiveType::BF16;
   } else if (type.isF16()) {

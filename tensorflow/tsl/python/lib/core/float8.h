@@ -20,6 +20,7 @@ limitations under the License.
 
 namespace tsl {
 
+// float8_e4m3fn
 // Register the float8_e4m3fn numpy type. Returns true on success.
 bool RegisterNumpyFloat8e4m3fn();
 
@@ -29,6 +30,7 @@ PyObject* Float8e4m3fnDtype();
 // Returns the id number of the float8_e4m3fn numpy type.
 int Float8e4m3fnNumpyType();
 
+// float8_e5m2
 // Register the float8_e5m2 numpy type. Returns true on success.
 bool RegisterNumpyFloat8e5m2();
 
@@ -37,6 +39,26 @@ PyObject* Float8e5m2Dtype();
 
 // Returns the id number of the float8_e5m2 numpy type.
 int Float8e5m2NumpyType();
+
+// float8_e4m3fnuz
+// Register the float8_e4m3fnuz numpy type. Returns true on success.
+bool RegisterNumpyFloat8e4m3fnuz();
+
+// Returns a pointer to the float8_e4m3fn dtype object.
+PyObject* Float8e4m3fnuzDtype();
+
+// Returns the id number of the float8_e4m3fn numpy type.
+int Float8e4m3fnuzNumpyType();
+
+// float8_e5m2fnuz
+// Register the float8_e5m2fnuz numpy type. Returns true on success.
+bool RegisterNumpyFloat8e5m2fnuz();
+
+// Returns a pointer to the float8_e5m2fnuz dtype object.
+PyObject* Float8e5m2fnuzDtype();
+
+// Returns the id number of the float8_e5m2fnuz numpy type.
+int Float8e5m2fnuzNumpyType();
 
 }  // namespace tsl
 

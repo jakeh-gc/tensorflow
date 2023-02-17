@@ -58,6 +58,8 @@ StatusOr<xla::PrimitiveType> ToPrimitiveType(DType dtype) {
     case DType::kC64:
     case DType::kC128:
     case DType::kToken:
+    case DType::kF8E4M3FNUZ:
+    case DType::kF8E5M2FNUZ:
       return static_cast<xla::PrimitiveType>(static_cast<int>(dtype.kind()));
     case DType::kString:
       return InvalidArgument("Not supported as XLA PrimitiveType: %d",
@@ -87,6 +89,8 @@ StatusOr<DType> ToDType(xla::PrimitiveType primitive_type) {
     case xla::PrimitiveType::C64:
     case xla::PrimitiveType::C128:
     case xla::PrimitiveType::TOKEN:
+    case xla::PrimitiveType::F8E4M3FNUZ:
+    case xla::PrimitiveType::F8E5M2FNUZ:
       return DType(static_cast<DType::Kind>(static_cast<int>(primitive_type)));
     default:
       return InvalidArgument("Invalid XLA PrimitiveType: %d",

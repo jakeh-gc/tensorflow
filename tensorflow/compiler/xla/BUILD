@@ -206,6 +206,7 @@ cc_library(
     visibility = [":friends"],
     deps = [
         "//third_party/eigen3",
+        "//tensorflow/tsl/platform:float8",
     ],
 )
 

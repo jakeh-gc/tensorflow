@@ -53,6 +53,12 @@ struct CopySign<float8_e4m3fn> : CopySignFloat8<float8_e4m3fn> {};
 template <>
 struct CopySign<float8_e5m2> : CopySignFloat8<float8_e5m2> {};
 
+template <>
+struct CopySign<float8_e4m3fnuz> : CopySignFloat8<float8_e4m3fnuz> {};
+
+template <>
+struct CopySign<float8_e5m2fnuz> : CopySignFloat8<float8_e5m2fnuz> {};
+
 template <typename T>
 struct NextAfterFloat8 {
   T operator()(T from, T to) {
@@ -94,6 +100,12 @@ struct NextAfter<float8_e4m3fn> : NextAfterFloat8<float8_e4m3fn> {};
 template <>
 struct NextAfter<float8_e5m2> : NextAfterFloat8<float8_e5m2> {};
 
+template <>
+struct NextAfter<float8_e4m3fnuz> : NextAfterFloat8<float8_e4m3fnuz> {};
+
+template <>
+struct NextAfter<float8_e5m2fnuz> : NextAfterFloat8<float8_e5m2fnuz> {};
+
 // Since float8_e4m3fn doesn't have `inf`, we need to modify to use `max`.
 template <>
 struct Spacing<float8_e4m3fn> {
@@ -104,6 +116,32 @@ struct Spacing<float8_e4m3fn> {
     }
     float8_e4m3fn away = copysign(std::numeric_limits<float8_e4m3fn>::max(), x);
     return NextAfter<float8_e4m3fn>()(x, away) - x;
+  }
+};
+
+// Since float8_e4m3fnuz doesn't have `inf`, we need to modify to use `max`.
+template <>
+struct Spacing<float8_e4m3fnuz> {
+  float8_e4m3fnuz operator()(float8_e4m3fnuz x) {
+    CopySign<float8_e4m3fnuz> copysign;
+    if (Eigen::numext::abs(x) == std::numeric_limits<float8_e4m3fnuz>::max()) {
+      return copysign(std::numeric_limits<float8_e4m3fnuz>::quiet_NaN(), x);
+    }
+    float8_e4m3fnuz away = copysign(std::numeric_limits<float8_e4m3fnuz>::max(), x);
+    return NextAfter<float8_e4m3fnuz>()(x, away) - x;
+  }
+};
+
+// Since float8_e5m2fnuz doesn't have `inf`, we need to modify to use `max`.
+template <>
+struct Spacing<float8_e5m2fnuz> {
+  float8_e5m2fnuz operator()(float8_e5m2fnuz x) {
+    CopySign<float8_e5m2fnuz> copysign;
+    if (Eigen::numext::abs(x) == std::numeric_limits<float8_e5m2fnuz>::max()) {
+      return copysign(std::numeric_limits<float8_e5m2fnuz>::quiet_NaN(), x);
+    }
+    float8_e5m2fnuz away = copysign(std::numeric_limits<float8_e5m2fnuz>::max(), x);
+    return NextAfter<float8_e5m2fnuz>()(x, away) - x;
   }
 };
 
@@ -140,6 +178,37 @@ struct TypeDescriptor<float8_e5m2>
   static constexpr char kNpyDescrByteorder = '=';
 };
 
+template <>
+struct TypeDescriptor<float8_e4m3fnuz>
+    : custom_float_internal::CustomFloatTypeDescriptor<float8_e4m3fnuz> {
+  typedef float8_e4m3fnuz T;
+  static constexpr const char* kTypeName = "float8_e4m3fnuz";
+  static constexpr const char* kTpDoc = "float8_e4m3fnuz floating-point values";
+  // We must register float8_e4m3fnuz with a unique kind, because numpy
+  // considers two types with the same kind and size to be equal.
+  // The downside of this is that NumPy scalar promotion does not work with
+  // float8 values.  Using 'V' to mirror bfloat16 vs float16.
+  static constexpr char kNpyDescrKind = 'V';
+  // TODO(phawkins): there doesn't seem to be a way of guaranteeing a type
+  // character is unique.
+  static constexpr char kNpyDescrType = '6';
+  static constexpr char kNpyDescrByteorder = '=';
+};
+
+template <>
+struct TypeDescriptor<float8_e5m2fnuz>
+    : custom_float_internal::CustomFloatTypeDescriptor<float8_e5m2fnuz> {
+  typedef float8_e5m2fnuz T;
+  static constexpr const char* kTypeName = "float8_e5m2fnuz";
+  static constexpr const char* kTpDoc = "float8_e5m2fnuz floating-point values";
+  // Treating e5m2 as the natural "float" type since it is IEEE-754 compliant.
+  static constexpr char kNpyDescrKind = 'V';
+  // TODO(phawkins): there doesn't seem to be a way of guaranteeing a type
+  // character is unique.
+  static constexpr char kNpyDescrType = '7';
+  static constexpr char kNpyDescrByteorder = '=';
+};
+
 }  // namespace custom_float_internal
 
 namespace {
@@ -169,6 +238,15 @@ bool Initialize() {
           numpy.get())) {
     return false;
   }
+  
+  if (!tsl::custom_float_internal::RegisterNumpyDtype<float8_e4m3fnuz>(
+          numpy.get())) {
+    return false;
+  }
+  if (!tsl::custom_float_internal::RegisterNumpyDtype<float8_e5m2fnuz>(
+          numpy.get())) {
+    return false;
+  }
 
   // Register casts between float8 types. Only perform the cast if
   // float8_e4m3b11 hasn't been previously registered, presumably by a different
@@ -178,6 +256,31 @@ bool Initialize() {
   if (!float8_already_registered &&
       !tsl::custom_float_internal::RegisterCustomFloatCast<float8_e4m3fn,
                                                            float8_e5m2>()) {
+    return false;
+  }
+
+  // Register casts between float8 types.
+  if (!float8_already_registered &&
+      !tsl::custom_float_internal::RegisterCustomFloatCast<float8_e4m3fn,
+                                                           float8_e5m2>()) {
+    return false;
+  }
+
+  if (!float8_already_registered &&
+      !tsl::custom_float_internal::RegisterCustomFloatCast<float8_e4m3fn,
+                                                           float8_e4m3fnuz>()) {
+    return false;
+  }
+
+  if (!float8_already_registered &&
+      !tsl::custom_float_internal::RegisterCustomFloatCast<float8_e5m2fnuz,
+                                                           float8_e5m2>()) {
+    return false;
+  }
+
+  if (!float8_already_registered &&
+      !tsl::custom_float_internal::RegisterCustomFloatCast<float8_e4m3fnuz,
+                                                           float8_e5m2fnuz>()) {
     return false;
   }
 
@@ -234,6 +337,56 @@ PyObject* Float8e5m2Dtype() {
 
 int Float8e5m2NumpyType() {
   return tsl::custom_float_internal::TypeDescriptor<float8_e5m2>::Dtype();
+}
+
+bool RegisterNumpyFloat8e4m3fnuz() {
+  if (tsl::custom_float_internal::TypeDescriptor<float8_e4m3fnuz>::Dtype() !=
+      NPY_NOTYPE) {
+    // Already initialized.
+    return true;
+  }
+  if (!Initialize()) {
+    if (!PyErr_Occurred()) {
+      PyErr_SetString(PyExc_RuntimeError, "cannot load float8_e4m3fnuz module.");
+    }
+    PyErr_Print();
+    return false;
+  }
+  return true;
+}
+
+PyObject* Float8e4m3fnuzDtype() {
+  return reinterpret_cast<PyObject*>(
+      tsl::custom_float_internal::TypeDescriptor<float8_e4m3fnuz>::type_ptr);
+}
+
+int Float8e4m3fnuzNumpyDType() {
+  return tsl::custom_float_internal::TypeDescriptor<float8_e4m3fnuz>::Dtype();
+}
+
+bool RegisterNumpyFloat8e5m2fnuz() {
+  if (tsl::custom_float_internal::TypeDescriptor<float8_e5m2fnuz>::Dtype() !=
+      NPY_NOTYPE) {
+    // Already initialized.
+    return true;
+  }
+  if (!Initialize()) {
+    if (!PyErr_Occurred()) {
+      PyErr_SetString(PyExc_RuntimeError, "cannot load float8_e5m2fnuz module.");
+    }
+    PyErr_Print();
+    return false;
+  }
+  return true;
+}
+
+PyObject* Float8e5m2fnuzDtype() {
+  return reinterpret_cast<PyObject*>(
+      tsl::custom_float_internal::TypeDescriptor<float8_e5m2fnuz>::type_ptr);
+}
+
+int Float8e5m2fnuzNumpyType() {
+  return tsl::custom_float_internal::TypeDescriptor<float8_e5m2fnuz>::Dtype();
 }
 
 }  // namespace tsl

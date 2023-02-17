@@ -112,6 +112,12 @@ Literal CreateScalar(PrimitiveType primitive_type, Args... args) {
     case F8E4M3FN:
       return CreateScalarImpl<F8E4M3FN>(F<F8E4M3FN>{},
                                         std::forward<Args>(args)...);
+    case F8E5M2FNUZ:
+      return CreateScalarImpl<F8E5M2FNUZ>(F<F8E5M2FNUZ>{}, 
+                                      std::forward<Args>(args)...);
+    case F8E4M3FNUZ:
+      return CreateScalarImpl<F8E4M3FNUZ>(F<F8E4M3FNUZ>{},
+                                          std::forward<Args>(args)...);
     case F16:
       return CreateScalarImpl<F16>(F<F16>{}, std::forward<Args>(args)...);
     case BF16:
@@ -155,7 +161,8 @@ template <typename T>
 struct IsReal {
   static constexpr bool value =
       std::is_integral<T>::value || std::is_floating_point<T>::value ||
-      std::is_same<bfloat16, T>::value || std::is_same<half, T>::value;
+      std::is_same<bfloat16, T>::value || std::is_same<half, T>::value ||
+      std::is_same<float8_e4m3fnuz, T>::value || std::is_same<float8_e5m2fnuz, T>::value;
 };
 
 template <typename T>
@@ -182,6 +189,26 @@ std::enable_if_t<std::is_floating_point<NativeT>::value, NativeT> GetMaxImpl() {
 
 template <typename NativeT>
 std::enable_if_t<std::is_floating_point<NativeT>::value, NativeT> GetMinImpl() {
+  return -std::numeric_limits<NativeT>::infinity();
+}
+
+template <typename NativeT>
+std::enable_if_t<std::is_same<NativeT, float8_e4m3fnuz>::value, NativeT> GetMaxImpl() {
+  return std::numeric_limits<NativeT>::infinity();
+}
+
+template <typename NativeT>
+std::enable_if_t<std::is_same<NativeT, float8_e4m3fnuz>::value, NativeT> GetMinImpl() {
+  return -std::numeric_limits<NativeT>::infinity();
+}
+
+template <typename NativeT>
+std::enable_if_t<std::is_same<NativeT, float8_e5m2fnuz>::value, NativeT> GetMaxImpl() {
+  return std::numeric_limits<NativeT>::infinity();
+}
+
+template <typename NativeT>
+std::enable_if_t<std::is_same<NativeT, float8_e5m2fnuz>::value, NativeT> GetMinImpl() {
   return -std::numeric_limits<NativeT>::infinity();
 }
 

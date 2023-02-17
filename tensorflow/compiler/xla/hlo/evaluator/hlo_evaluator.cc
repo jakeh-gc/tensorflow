@@ -837,6 +837,11 @@ HloEvaluator::HloEvaluator(int64_t max_loop_iterations)
   typed_visitors_[F8E4M3FN] =
       std::make_unique<HloEvaluatorTypedVisitor<tsl::float8_e4m3fn, float>>(
           this);
+  typed_visitors_[F8E5M2FNUZ] =
+      std::make_unique<HloEvaluatorTypedVisitor<tsl::float8_e5m2fnuz, float>>(this);
+  typed_visitors_[F8E4M3FNUZ] =
+      std::make_unique<HloEvaluatorTypedVisitor<tsl::float8_e4m3fnuz, float>>(
+          this);
 
   typed_visitors_[TUPLE] =
       std::make_unique<FunctionVisitor>([](HloInstruction*) {
@@ -1381,6 +1386,8 @@ Status HloEvaluator::HandleIsFinite(HloInstruction* is_finite) {
           PrimitiveType_Name(elem_ty));
     case F8E5M2:
     case F8E4M3FN:
+    case F8E5M2FNUZ:
+    case F8E4M3FNUZ:
       return InvalidArgument("F8 is unsupported in IsFinite");
 
     case F16: {

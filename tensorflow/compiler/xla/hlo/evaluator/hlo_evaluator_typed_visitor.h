@@ -1638,6 +1638,16 @@ class HloEvaluatorTypedVisitor : public DfsHloVisitorWithDefault {
                             MapImpl<tsl::float8_e4m3fn>(map));
         break;
       }
+      case F8E5M2FNUZ: {
+        TF_ASSIGN_OR_RETURN(parent_->evaluated_[map],
+                            MapImpl<tsl::float8_e5m2fnuz>(map));
+        break;
+      }
+      case F8E4M3FNUZ: {
+        TF_ASSIGN_OR_RETURN(parent_->evaluated_[map],
+                            MapImpl<tsl::float8_e4m3fnuz>(map));
+        break;
+      }
       case F16: {
         TF_ASSIGN_OR_RETURN(parent_->evaluated_[map],
                             MapImpl<Eigen::half>(map));
@@ -2640,6 +2650,8 @@ extern template class HloEvaluatorTypedVisitor<complex128>;
 extern template class HloEvaluatorTypedVisitor<bfloat16, float>;
 extern template class HloEvaluatorTypedVisitor<tsl::float8_e5m2, float>;
 extern template class HloEvaluatorTypedVisitor<tsl::float8_e4m3fn, float>;
+extern template class HloEvaluatorTypedVisitor<tsl::float8_e5m2fnuz, float>;
+extern template class HloEvaluatorTypedVisitor<tsl::float8_e4m3fnuz, float>;
 
 }  // namespace xla
 

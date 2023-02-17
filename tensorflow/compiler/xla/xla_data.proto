@@ -73,6 +73,19 @@ enum PrimitiveType {
   F8E5M2 = 19;
   F8E4M3FN = 20;
 
+  // FP8 dtypes, as described in this paper: https://arxiv.org/abs/2206.02915
+  //
+  // F8E5M2FNUZ has 5 exponent bits and 2 mantissa bits.
+  // F8E4M3FNUZ has 4 exponent bits and 3 mantissa bits.
+  // 
+  // In both types, the "FN" means only Finite and NaN values are supported.
+  // The "UZ" means only unsigned zero is supported.Unlike IEEE types,
+  // infinities are not supported. NaN is represented when the sign bit is all
+  // 1s, and the exponent and mantissa bits are all 0s. All other values are
+  // finite.
+  F8E5M2FNUZ = 21;
+  F8E4M3FNUZ = 22;
+
   // Complex values of fixed width.
   C64 = 15;   // Paired F32 (real, imag), as in std::complex<float>.
   C128 = 18;  // Paired F64 (real, imag), as in std::complex<double>.
@@ -98,7 +111,7 @@ enum PrimitiveType {
   // primitive type will have empty dimensions and tuple_shapes fields.
   TOKEN = 17;
 
-  // Next = 21
+  // Next = 23
 }
 // LINT.ThenChange(
 //   https://www.tensorflow.org/code/tensorflow/compiler/xla/shape_util.cc,
@@ -496,8 +509,10 @@ message LiteralProto {
   bytes s16s = 17;
   bytes f8e5m2s = 19;
   bytes f8e4m3fns = 20;
+  bytes f8e5m2fnuzs = 21;
+  bytes f8e4m3fnuzs = 22;
   repeated int64 sparse_indices = 14;
-  // Next = 21
+  // Next = 23
 }
 
 message WindowDimension {

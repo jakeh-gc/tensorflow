@@ -48,6 +48,10 @@ XlaOp ConstantR0WithType(XlaBuilder* builder, PrimitiveType type, T value) {
   switch (type) {
     case PRED:
       return ConstantR0<bool>(builder, static_cast<bool>(value));
+    case F8E4M3FNUZ:
+      return ConstantR0<float8_e4m3fnuz>(builder, static_cast<float8_e4m3fnuz>(value));
+    case F8E5M2FNUZ:
+      return ConstantR0<float8_e5m2fnuz>(builder, static_cast<float8_e5m2fnuz>(value));
     case F16:
       return ConstantR0<half>(builder, static_cast<half>(value));
     case BF16:

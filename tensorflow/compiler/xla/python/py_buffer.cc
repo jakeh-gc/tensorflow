@@ -596,6 +596,16 @@ int PyBuffer_bf_getbuffer(PyObject* exporter, Py_buffer* view, int flags) {
       return InvalidArgument(
           "F8E5M2 buffer format not supported by Python buffer protocol.");
     }
+    if (buffer.on_device_shape().element_type() == F8E4M3FNUZ &&
+        ((flags & PyBUF_FORMAT) == PyBUF_FORMAT)) {
+      return InvalidArgument(
+          "F8E4M3FNUZ buffer format not supported by Python buffer protocol.");
+    }
+    if (buffer.on_device_shape().element_type() == F8E5M2FNUZ &&
+        ((flags & PyBUF_FORMAT) == PyBUF_FORMAT)) {
+      return InvalidArgument(
+          "F8E5M2FNUZ buffer format not supported by Python buffer protocol.");
+    }
     if ((flags & PyBUF_WRITEABLE) == PyBUF_WRITEABLE) {
       return InvalidArgument("XLA buffers are read-only.");
     }

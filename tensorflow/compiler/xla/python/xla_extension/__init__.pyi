@@ -53,6 +53,8 @@ class PrimitiveType(enum.IntEnum):
   U64: PrimitiveType
   F8_E4M3FN: PrimitiveType
   F8_E5M2: PrimitiveType
+  F8_E4M3FNUZ: PrimitiveType
+  F8_E5M2FNUZ: PrimitiveType
   BF16: PrimitiveType
   F16: PrimitiveType
   F32: PrimitiveType
@@ -66,6 +68,8 @@ class PrimitiveType(enum.IntEnum):
 def bfloat16_dtype() -> Type[Any]: ...
 def float8_e4m3fn_dtype() -> Type[Any]: ...
 def float8_e5m2_dtype() -> Type[Any]: ...
+def float8_e4m3fnuz_dtype() -> Type[Any]: ...
+def float8_e5m2fnuz_dtype() -> Type[Any]: ...
 
 # === BEGIN xla_compiler.cc
 

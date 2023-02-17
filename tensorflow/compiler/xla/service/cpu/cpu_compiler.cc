@@ -99,6 +99,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/batch_dot_simplification.h"
 #include "tensorflow/compiler/xla/service/batchnorm_expander.h"
 #include "tensorflow/compiler/xla/service/bfloat16_normalization.h"
+#include "tensorflow/compiler/xla/service/type_normalization.h"
 #include "tensorflow/compiler/xla/service/bitcast_dtypes_expander.h"
 #include "tensorflow/compiler/xla/service/broadcast_canonicalizer.h"
 #include "tensorflow/compiler/xla/service/buffer_assignment.h"
@@ -617,6 +618,11 @@ Status CpuCompiler::RunHloPassesThroughLayoutAssn(
   // most ops.
   BFloat16Support bf16;
   pipeline.AddPass<BFloat16Normalization>(&bf16);
+  
+  TypeSupport f8_e5m2fnuz_support(F8E5M2FNUZ, F32);
+  pipeline.AddPass<TypeNormalization>(F8E5M2FNUZ, F32, &f8_e5m2fnuz_support);
+  TypeSupport f8_e4m3fnuz_support(F8E4M3FNUZ, F32);
+  pipeline.AddPass<TypeNormalization>(F8E4M3FNUZ, F32, &f8_e4m3fnuz_support);
   // After canonicalization, there may be more batch dots that can be
   // simplified.
   pipeline.AddPass<BatchDotSimplification>();

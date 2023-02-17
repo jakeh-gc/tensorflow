@@ -72,6 +72,8 @@ class DType {
 
     kF8E4M3FN = 19,
     kF8E5M2 = 20,
+    kF8E4M3FNUZ = 21,
+    kF8E5M2FNUZ = 22,
 
     // Next = 21
 

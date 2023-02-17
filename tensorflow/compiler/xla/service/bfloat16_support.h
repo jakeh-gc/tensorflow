@@ -18,41 +18,13 @@ limitations under the License.
 
 #include "tensorflow/compiler/xla/hlo/ir/hlo_instruction.h"
 #include "tensorflow/compiler/xla/hlo/ir/hlo_opcode.h"
+#include "tensorflow/compiler/xla/service/type_support.h"
 
 namespace xla {
 
-class BFloat16Support {
+class BFloat16Support : public TypeSupport {
  public:
-  BFloat16Support() {}
-  virtual ~BFloat16Support() {}
-
-  // Returns whether the backend supports BF16 operand for the HLO instruction
-  // at the given index.
-  virtual bool SupportsBF16Operand(const HloInstruction& hlo,
-                                   int64_t operand_index) const;
-
-  // Returns whether the backend supports BF16 output for the HLO instruction.
-  virtual bool SupportsBF16Output(const HloInstruction& hlo) const;
-
-  // Returns whether the backend support mixed precision: the operands, output,
-  // and parameters/output of the called computations can have different
-  // precisions (BF16 and F32).
-  virtual bool SupportsMixedPrecisions(const HloInstruction& hlo) const;
-
-  // Returns whether the given HLO preserves its BF16 operand precision at the
-  // given index, so even if the output is F32, elements in the output that
-  // depend on the BF16 operand will still have BF16 effective precision even if
-  // they have F32 format. Similarly, this also means if the output is BF16 then
-  // increasing the operand precision from BF16 to F32 will not change the
-  // output. This typically includes HLOs that pass elements from the operand to
-  // the output without arithmetic operations.
-  static bool EffectiveOperandPrecisionIsOutputPrecision(
-      const HloInstruction& hlo, int64_t operand_index);
-
-  // Returns if the backend only uses BF16 precision for the operand at the
-  // specified index, even if the operand is F32.
-  virtual bool EffectiveOperandPrecisionIsBF16(const HloInstruction& hlo,
-                                               int64_t operand_index) const;
+  BFloat16Support() : TypeSupport(BF16, F32) {}
 };
 
 }  // namespace xla

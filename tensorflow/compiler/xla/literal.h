@@ -179,7 +179,9 @@ class LiteralBase {
                            std::is_same<T, Eigen::half>::value ||
                            std::is_same<T, bfloat16>::value ||
                            std::is_same<T, tsl::float8_e5m2>::value ||
-                           std::is_same<T, tsl::float8_e4m3fn>::value),
+                           std::is_same<T, tsl::float8_e4m3fn>::value ||
+                           std::is_same<T, tsl::float8_e5m2fnuz>::value ||
+                           std::is_same<T, tsl::float8_e4m3fnuz>::value),
                           bool>::type
   IsEqualAt(absl::Span<const int64_t> multi_index, T value) const {
     if (auto as_s64 = GetIntegralAsS64(multi_index)) {

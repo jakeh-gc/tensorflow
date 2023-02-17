@@ -38,21 +38,42 @@ xla::StatusOr<PrimitiveType> DtypeToPrimitiveType(const py::dtype& np_type) {
           {{'u', 2}, U16},
           {{'u', 4}, U32},
           {{'u', 8}, U64},
-          {{'V', 1}, F8E4M3FN},
           {{'f', 1}, F8E5M2},
-          {{'V', 2}, BF16},  // array protocol code for raw data (void*)
           {{'f', 2}, F16},
           {{'f', 4}, F32},
-          {{'f', 8}, F64},
+          {{'f', 8}, F64}, 
           {{'c', 8}, C64},
           {{'c', 16}, C128},
       });
-  auto it = types->find({np_type.kind(), np_type.itemsize()});
-  if (it == types->end()) {
-    return InvalidArgument("Unknown NumPy type %c size %d", np_type.kind(),
-                           np_type.itemsize());
+
+  static auto* void_types =
+      new absl::flat_hash_map<std::pair<std::string, int>, PrimitiveType>({
+          {{"float8_e4m3fn", 1}, F8E4M3FN},
+          {{"float8_e4m3fnuz", 1}, F8E4M3FNUZ},
+          {{"float8_e5m2fnuz", 1}, F8E5M2FNUZ},
+          {{"bfloat16", 2}, BF16},  // array protocol code for raw data (void*)
+      });
+  
+  // If we have a void type (kind = 'V'), we must additionally check the full
+  // type name.
+  if (np_type.kind() == 'V') {
+    std::string name = py::str(np_type.attr("name"));
+    auto it = void_types->find({name, np_type.itemsize()});
+    if (it == void_types->end()) {
+      return InvalidArgument("Unknown NumPy %s with kind %c and size %d", name, np_type.kind(),
+                            np_type.itemsize());
+    }
+
+    return it->second;
+  } else {
+    auto it = types->find({np_type.kind(), np_type.itemsize()});
+    if (it == types->end()) {
+      return InvalidArgument("Unknown NumPy type %c size %d", np_type.kind(),
+                            np_type.itemsize());
+    }
+
+    return it->second;
   }
-  return it->second;
 }
 
 xla::StatusOr<py::dtype> PrimitiveTypeToDtype(PrimitiveType type) {
@@ -83,6 +104,14 @@ xla::StatusOr<py::dtype> PrimitiveTypeToDtype(PrimitiveType type) {
     case F8E5M2: {
       py::handle f8_e5m2(tsl::Float8e5m2Dtype());
       return py::dtype::from_args(py::reinterpret_borrow<py::object>(f8_e5m2));
+    }
+    case F8E4M3FNUZ: {
+      py::handle f8(tsl::Float8e4m3fnuzDtype());
+      return py::dtype::from_args(py::reinterpret_borrow<py::object>(f8));
+    }
+    case F8E5M2FNUZ: {
+      py::handle f8(tsl::Float8e5m2fnuzDtype());
+      return py::dtype::from_args(py::reinterpret_borrow<py::object>(f8));
     }
     case BF16: {
       py::handle bfloat16(tsl::Bfloat16Dtype());
@@ -123,6 +152,10 @@ const NumpyScalarTypes& GetNumpyScalarTypes() {
         py::reinterpret_borrow<py::object>(tsl::Float8e4m3fnDtype());
     dtypes->np_float8_e5m2 =
         py::reinterpret_borrow<py::object>(tsl::Float8e5m2Dtype());
+    dtypes->np_float8_e4m3fnuz =
+        py::reinterpret_borrow<py::object>(tsl::Float8e4m3fnuzDtype());
+    dtypes->np_float8_e5m2fnuz =
+        py::reinterpret_borrow<py::object>(tsl::Float8e5m2fnuzDtype());
     dtypes->np_float16 = py::object(numpy.attr("float16"));
     dtypes->np_float32 = py::object(numpy.attr("float32"));
     dtypes->np_float64 = py::object(numpy.attr("float64"));

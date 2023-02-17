@@ -26,6 +26,7 @@ limitations under the License.
 #include "absl/algorithm/container.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_cat.h"
+#include "llvm/ADT/APFloat.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
@@ -103,11 +104,14 @@ StatusOr<llvm::Value*> EmitReducePrecisionIR(
     // Compute rounding bias for round-to-nearest with ties to even.  This is
     // equal to a base value of 0111... plus one bit if the last remaining
     // mantissa bit is 1.
+    // base_rounding_bias = 0b0111111111111111111111
     APInt base_rounding_bias = last_mantissa_bit_mask.lshr(1) - 1;
+    // x_last_mantissa_bit = ((x_as_int & 0b0111111111111111111111) >> (src_mantissa_bits - dest_mantissa_bits))
     llvm::Value* x_last_mantissa_bit = b->CreateLShr(
         b->CreateAnd(x_as_int,
                      llvm::ConstantInt::get(int_type, last_mantissa_bit_mask)),
         (src_mantissa_bits - dest_mantissa_bits));
+    // x_rounding_bias = x_last_mantissa_bit + 0b1
     llvm::Value* x_rounding_bias =
         b->CreateAdd(x_last_mantissa_bit,
                      llvm::ConstantInt::get(int_type, base_rounding_bias));
@@ -463,6 +467,223 @@ llvm::Value* EmitF8e4m3fnToF16(llvm::Value* f8_value, llvm::IRBuilder<>* b) {
   return b->CreateBitCast(f16_as_int, b->getHalfTy());
 }
 
+StatusOr<llvm::Value*> EmitF16ToF8e5m2fnuz(llvm::Value* f16_value, llvm::IRBuilder<>* b) {
+  llvm::Value* f16_uint = b->CreateBitCast(f16_value, b->getInt16Ty());
+  llvm::Value* sign = b->CreateAnd(f16_uint, 0x8000u);
+  llvm::Value* f16_uint_abs = b->CreateAnd(f16_uint, 0x7FFFu);
+
+  llvm::Value* out_of_range_pred = b->CreateICmpUGT(f16_uint_abs, llvm::ConstantInt::get(b->getInt16Ty(), 0x7B80u));
+  
+  // We may now assume there won't be any further overflow issues. They will be handled in the final select.
+  
+  // Borrowed from EmitReducePrecisionIR, but specialised to these types. 
+  const uint16_t last_mantissa_bit_mask = (1 << 8);
+  const uint16_t base_rounding_bias = (last_mantissa_bit_mask >> 1) - 1;
+  llvm::Value* x_last_mantissa_bit = b->CreateLShr(b->CreateAnd(f16_uint, last_mantissa_bit_mask), 8);
+  llvm::Value* x_rounding_bias = b->CreateAdd(x_last_mantissa_bit, llvm::ConstantInt::get(b->getInt16Ty(), base_rounding_bias));
+  llvm::Value* f16_uint_rounded = b->CreateAdd(f16_uint, x_rounding_bias);
+
+  // Extract and "de-bias" the exponent.
+  llvm::Value* exponent = b->CreateAnd(f16_uint_rounded, 0x7C00u);
+  exponent = b->CreateLShr(exponent, 10);
+  exponent = b->CreateSub(exponent, llvm::ConstantInt::get(b->getInt16Ty(), 0xF));
+
+  llvm::Value* input_norm = b->CreateICmpNE(exponent, llvm::ConstantInt::get(b->getInt16Ty(), -15));
+
+  // Handle the special case of a zero exponent. In IEEE half, this means the exponent is -14.
+  exponent = b->CreateSelect(input_norm, exponent, llvm::ConstantInt::get(b->getInt16Ty(), -14));
+
+  // Extract the mantissa.
+  llvm::Value* mantissa = b->CreateAnd(f16_uint_rounded, 0x03FFu);
+
+  // Add the otherwise implicit 1 at the front of the mantissa for normal numbers.
+  // This means we don't have to treat input denorms as a special case.
+  llvm::Value* mantissa_norm = b->CreateOr(mantissa, 0x0400u);
+  mantissa = b->CreateSelect(input_norm, mantissa_norm, mantissa);
+
+  // Count the number of leading zeros. This will inform how much to shift right, and how much to rebias the exponent.
+  llvm::Value* zero_count = b->CreateBinaryIntrinsic(llvm::Intrinsic::ctlz, mantissa, llvm::ConstantInt::get(b->getInt1Ty(), 0x0u));
+  zero_count = b->CreateSub(zero_count, llvm::ConstantInt::get(b->getInt16Ty(), 5));
+  llvm::Value* shift = b->CreateSub(llvm::ConstantInt::get(b->getInt16Ty(), 8), zero_count);
+
+  // Shift the mantissa to the right so that the msb is at bit 2.
+  mantissa = b->CreateLShr(mantissa, shift);
+  exponent = b->CreateSub(exponent, zero_count);
+
+  // Correct for output denorm.
+  llvm::Value* output_norm = b->CreateICmpSGE(exponent, llvm::ConstantInt::get(b->getInt16Ty(), -15));
+  shift = b->CreateSub(llvm::ConstantInt::get(b->getInt16Ty(), -15), exponent);
+  llvm::Value* mantissa_denorm = b->CreateLShr(mantissa, shift);
+  
+  mantissa = b->CreateSelect(output_norm, mantissa, mantissa_denorm);
+  exponent = b->CreateSelect(output_norm, exponent, llvm::ConstantInt::get(b->getInt16Ty(), -16));
+
+  // Shift the sign down from bit 15 to bit 7.
+  llvm::Value* result = b->CreateLShr(sign, 8);
+  // Bias the exponent for the output.
+  exponent = b->CreateAdd(exponent, llvm::ConstantInt::get(b->getInt16Ty(), 16));
+  // Shift it into position.
+  exponent = b->CreateShl(exponent, 2);
+  result = b->CreateOr(result, exponent);
+
+  mantissa = b->CreateAnd(mantissa, 0x3u);
+  result = b->CreateOr(result, mantissa);
+  // Truncate down to int8.
+  result = b->CreateTrunc(result, b->getInt8Ty());
+
+  // Select based on whether the value was in range.
+  return b->CreateSelect(out_of_range_pred, llvm::ConstantInt::get(b->getInt8Ty(), 0x80u), result);
+}
+
+llvm::Value* EmitF8e5m2fnuzToF16(llvm::Value* f8_value, llvm::IRBuilder<>* b, llvm::Module* module) {
+  llvm::Constant* result_lut[128];
+
+  for (uint8_t i = 0; i < 128; ++i) {
+    llvm::APFloat value(llvm::APFloat::Float8E5M2FNUZ(), llvm::APInt(8, i));
+
+    bool losesInfo;
+    value.convert(llvm::APFloat::IEEEhalf(), llvm::APFloat::rmNearestTiesToEven, &losesInfo);
+
+    result_lut[i] = llvm::ConstantInt::get(
+      b->getInt16Ty(),
+      static_cast<uint16_t>(value.bitcastToAPInt().getRawData()[0] & 0x7FFF));
+  }
+
+  llvm::ArrayType* result_lut_array_type =
+      llvm::ArrayType::get(b->getInt16Ty(), 128);
+
+  llvm::Constant* result_lut_array = llvm::ConstantArray::get(result_lut_array_type, result_lut);
+  llvm::GlobalVariable* global_result_lut_array = new llvm::GlobalVariable(
+      /*M=*/*module,
+      /*Ty=*/result_lut_array_type,
+      /*isConstant=*/true,
+      /*Linkage=*/llvm::GlobalValue::PrivateLinkage,
+      /*Initializer=*/result_lut_array,
+      /*Name=*/"f8e5m2fnuzToF16LUT");
+
+  llvm::Value* nan_pred = b->CreateICmpEQ(f8_value, llvm::ConstantInt::get(b->getInt8Ty(), 0x80));
+
+  llvm::Value* sign = b->CreateAnd(f8_value, 0x80);
+  llvm::Value* f8_abs = b->CreateAnd(f8_value, 0x7F);
+
+  llvm::Value* result_abs = b->CreateGEP(b->getInt16Ty(), global_result_lut_array, f8_abs);
+  result_abs = b->CreateLoad(b->getInt16Ty(), result_abs);
+  sign = b->CreateZExt(sign, b->getInt16Ty());
+  sign = b->CreateShl(sign, 8);
+  llvm::Value* result = b->CreateOr(sign, result_abs);
+
+  return b->CreateBitCast(
+    b->CreateSelect(nan_pred, llvm::ConstantInt::get(b->getInt16Ty(), 0x7E00), result), b->getHalfTy());
+}
+
+llvm::Value* EmitF16ToF8e4m3fnuz(llvm::Value* f16_value, llvm::IRBuilder<>* b) {
+  llvm::Value* f16_uint = b->CreateBitCast(f16_value, b->getInt16Ty());
+  llvm::Value* sign = b->CreateAnd(f16_uint, 0x8000u);
+  llvm::Value* f16_uint_abs = b->CreateAnd(f16_uint, 0x7FFFu);
+
+  llvm::Value* out_of_range_pred = b->CreateICmpUGT(f16_uint_abs, llvm::ConstantInt::get(b->getInt16Ty(), 0x5B80u));
+  
+  // We may now assume there won't be any further overflow issues. They will be handled in the final select.
+  
+  // Borrowed from EmitReducePrecisionIR, but specialised to these types. 
+  const uint16_t last_mantissa_bit_mask = (1 << 7);
+  const uint16_t base_rounding_bias = (last_mantissa_bit_mask >> 1) - 1;
+  llvm::Value* x_last_mantissa_bit = b->CreateLShr(b->CreateAnd(f16_uint, last_mantissa_bit_mask), 7);
+  llvm::Value* x_rounding_bias = b->CreateAdd(x_last_mantissa_bit, llvm::ConstantInt::get(b->getInt16Ty(), base_rounding_bias));
+  llvm::Value* f16_uint_rounded = b->CreateAdd(f16_uint, x_rounding_bias);
+
+  // Extract and "de-bias" the exponent.
+  llvm::Value* exponent = b->CreateAnd(f16_uint_rounded, 0x7C00u);
+  exponent = b->CreateLShr(exponent, 10);
+  exponent = b->CreateSub(exponent, llvm::ConstantInt::get(b->getInt16Ty(), 0xF));
+
+  llvm::Value* input_norm = b->CreateICmpNE(exponent, llvm::ConstantInt::get(b->getInt16Ty(), -15));
+
+  // Handle the special case of a zero exponent. In IEEE half, this means the exponent is -14.
+  exponent = b->CreateSelect(input_norm, exponent, llvm::ConstantInt::get(b->getInt16Ty(), -14));
+
+  // Extract the mantissa.
+  llvm::Value* mantissa = b->CreateAnd(f16_uint_rounded, 0x03FFu);
+
+  // Add the otherwise implicit 1 at the front of the mantissa for normal numbers.
+  // This means we don't have to treat input denorms as a special case.
+  llvm::Value* mantissa_norm = b->CreateOr(mantissa, 0x0400u);
+  mantissa = b->CreateSelect(input_norm, mantissa_norm, mantissa);
+
+  // Count the number of leading zeros. This will inform how much to shift right, and how much to rebias the exponent.
+  llvm::Value* zero_count = b->CreateBinaryIntrinsic(llvm::Intrinsic::ctlz, mantissa, llvm::ConstantInt::get(b->getInt1Ty(), 0x0u));
+  zero_count = b->CreateSub(zero_count, llvm::ConstantInt::get(b->getInt16Ty(), 5));
+  llvm::Value* shift = b->CreateSub(llvm::ConstantInt::get(b->getInt16Ty(), 7), zero_count);
+
+  // Shift the mantissa to the right so that the msb is at bit 3.
+  mantissa = b->CreateLShr(mantissa, shift);
+  exponent = b->CreateSub(exponent, zero_count);
+
+  // Correct for output denorm.
+  llvm::Value* output_norm = b->CreateICmpSGE(exponent, llvm::ConstantInt::get(b->getInt16Ty(), -7));
+  shift = b->CreateSub(llvm::ConstantInt::get(b->getInt16Ty(), -7), exponent);
+  llvm::Value* mantissa_denorm = b->CreateLShr(mantissa, shift);
+  
+  mantissa = b->CreateSelect(output_norm, mantissa, mantissa_denorm);
+  exponent = b->CreateSelect(output_norm, exponent, llvm::ConstantInt::get(b->getInt16Ty(), -8));
+
+  // Shift the sign down from bit 15 to bit 7.
+  llvm::Value* result = b->CreateLShr(sign, 8);
+  // Bias the exponent for the output.
+  exponent = b->CreateAdd(exponent, llvm::ConstantInt::get(b->getInt16Ty(), 8));
+  // Shift it into position.
+  exponent = b->CreateShl(exponent, 3);
+  result = b->CreateOr(result, exponent);
+
+  mantissa = b->CreateAnd(mantissa, 0x7u);
+  result = b->CreateOr(result, mantissa);
+  // Truncate down to int8.
+  result = b->CreateTrunc(result, b->getInt8Ty());
+
+  // Select based on whether the value was in range.
+  return b->CreateSelect(out_of_range_pred, llvm::ConstantInt::get(b->getInt8Ty(), 0x80u), result);
+}
+
+llvm::Value* EmitF8e4m3fnuzToF16(llvm::Value* f8_value, llvm::IRBuilder<>* b, llvm::Module* module) {
+  llvm::Constant* result_lut[128];
+
+  for (uint8_t i = 0; i < 128; ++i) {
+    llvm::APFloat value(llvm::APFloat::Float8E4M3FNUZ(), llvm::APInt(8, i));
+
+    bool losesInfo;
+    value.convert(llvm::APFloat::IEEEhalf(), llvm::APFloat::rmNearestTiesToEven, &losesInfo);
+
+    result_lut[i] = llvm::ConstantInt::get(
+      b->getInt16Ty(),
+      static_cast<uint16_t>(value.bitcastToAPInt().getRawData()[0] & 0x7FFF));
+  }
+
+  llvm::ArrayType* result_lut_array_type =
+      llvm::ArrayType::get(b->getInt16Ty(), 128);
+
+  llvm::Constant* result_lut_array = llvm::ConstantArray::get(result_lut_array_type, result_lut);
+  llvm::GlobalVariable* global_result_lut_array = new llvm::GlobalVariable(
+      /*M=*/*module,
+      /*Ty=*/result_lut_array_type,
+      /*isConstant=*/true,
+      /*Linkage=*/llvm::GlobalValue::PrivateLinkage,
+      /*Initializer=*/result_lut_array,
+      /*Name=*/"f8e4m3fnuzToF16LUT");
+
+  llvm::Value* nan_pred = b->CreateICmpEQ(f8_value, llvm::ConstantInt::get(b->getInt8Ty(), 0x80));
+
+  llvm::Value* sign = b->CreateAnd(f8_value, 0x80);
+  llvm::Value* f8_abs = b->CreateAnd(f8_value, 0x7F);
+
+  llvm::Value* result_abs = b->CreateGEP(b->getInt16Ty(), global_result_lut_array, f8_abs);
+  result_abs = b->CreateLoad(b->getInt16Ty(), result_abs);
+  sign = b->CreateZExt(sign, b->getInt16Ty());
+  sign = b->CreateShl(sign, 8);
+  llvm::Value* result = b->CreateOr(sign, result_abs);
+
+  return b->CreateBitCast(b->CreateSelect(nan_pred, llvm::ConstantInt::get(b->getInt16Ty(), 0x7E00), result), b->getHalfTy());
+}
+
 llvm::Value* EmitIntegralToFloating(llvm::Value* integer_value,
                                     PrimitiveType from_type,
                                     PrimitiveType to_type, llvm::Module* module,
@@ -544,6 +765,18 @@ StatusOr<llvm::Value*> ElementalIrEmitter::EmitIntegerUnaryOp(
         }
         if (to_type == F8E4M3FN) {
           return EmitF16ToF8e4m3fn(
+              EmitIntegralToFloating(operand_value, from_type, F16, module_,
+                                     b_),
+              b_);
+        }
+        if (to_type == F8E5M2FNUZ) {
+          return EmitF16ToF8e5m2fnuz(
+              EmitIntegralToFloating(operand_value, from_type, F16, module_,
+                                     b_),
+              b_);
+        }
+        if (to_type == F8E4M3FNUZ) {
+          return EmitF16ToF8e4m3fnuz(
               EmitIntegralToFloating(operand_value, from_type, F16, module_,
                                      b_),
               b_);
@@ -674,6 +907,22 @@ StatusOr<llvm::Value*> ElementalIrEmitter::EmitFloatUnaryOp(
           return operand_value;
         }
       }
+      if (from_type == F8E5M2FNUZ) {
+        TF_RET_CHECK(to_type != F8E5M2FNUZ);
+        operand_value = EmitF8e5m2fnuzToF16(operand_value, b_, module_);
+        from_type = F16;
+        if (from_type == to_type) {
+          return operand_value;
+        }
+      }
+      if (from_type == F8E4M3FNUZ) {
+        TF_RET_CHECK(to_type != F8E4M3FNUZ);
+        operand_value = EmitF8e4m3fnuzToF16(operand_value, b_, module_);
+        from_type = F16;
+        if (from_type == to_type) {
+          return operand_value;
+        }
+      }
       if (primitive_util::IsComplexType(to_type)) {
         PrimitiveType to_component_type =
             primitive_util::ComplexComponentType(to_type);
@@ -710,6 +959,22 @@ StatusOr<llvm::Value*> ElementalIrEmitter::EmitFloatUnaryOp(
               operand_value, llvm_ir::PrimitiveTypeToIrType(F16, module_));
         }
         return EmitF16ToF8e4m3fn(operand_value, b_);
+      }
+      if (to_type == F8E5M2FNUZ) {
+        // Cast to F16 first. Casts to F8E5M2FNUZ must be from F16.
+        if (from_type != F16) {
+          operand_value = b_->CreateFPCast(
+              operand_value, llvm_ir::PrimitiveTypeToIrType(F16, module_));
+        }
+        return EmitF16ToF8e5m2fnuz(operand_value, b_);
+      }
+      if (to_type == F8E4M3FNUZ) {
+        // Cast to F16 first. Casts to F8E4M3FNUZ must be from F16.
+        if (from_type != F16) {
+          operand_value = b_->CreateFPCast(
+              operand_value, llvm_ir::PrimitiveTypeToIrType(F16, module_));
+        }
+        return EmitF16ToF8e4m3fnuz(operand_value, b_);
       }
       if (to_type == PRED) {
         return b_->CreateZExt(

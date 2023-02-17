@@ -70,6 +70,8 @@ constexpr uint8_t primitive_byte_size[PrimitiveType_ARRAYSIZE] = {
     sizeof(complex128),  // C128 = 18
     sizeof(float) / 4,   // F8E5M2 = 19
     sizeof(float) / 4,   // F8E4M3FN = 20
+    sizeof(float) / 4,   // F8E5M2FNUZ = 21
+    sizeof(float) / 4,   // F8E4M3FNUZ = 22
 };
 constexpr int64_t kAnnotationPrintInterval = 5;
 }  // namespace
@@ -522,6 +524,8 @@ ShapeUtil::MakeShapeWithDescendingLayoutAndSamePhysicalLayout(
     case S64:
     case F8E5M2:
     case F8E4M3FN:
+    case F8E5M2FNUZ:
+    case F8E4M3FNUZ:
     case F16:
     case BF16:
     case F32:
@@ -819,6 +823,10 @@ ShapeUtil::MakeShapeWithDescendingLayoutAndSamePhysicalLayout(
     case F8E5M2:
       return sizeof(float) / 4;
     case F8E4M3FN:
+      return sizeof(float) / 4;
+    case F8E5M2FNUZ:
+      return sizeof(float) / 4;
+    case F8E4M3FNUZ:
       return sizeof(float) / 4;
     case BF16:
       return sizeof(float) / 2;

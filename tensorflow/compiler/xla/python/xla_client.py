@@ -187,6 +187,8 @@ PrimitiveType = _xla.PrimitiveType
 bfloat16 = _xla.bfloat16_dtype()
 float8_e4m3fn = _xla.float8_e4m3fn_dtype()
 float8_e5m2 = _xla.float8_e5m2_dtype()
+float8_e4m3fnuz = _xla.float8_e4m3fnuz_dtype()
+float8_e5m2fnuz = _xla.float8_e5m2fnuz_dtype()
 
 XLA_ELEMENT_TYPE_TO_DTYPE = {
     PrimitiveType.PRED: np.dtype('bool'),
@@ -208,6 +210,8 @@ XLA_ELEMENT_TYPE_TO_DTYPE = {
     PrimitiveType.C128: np.dtype('complex128'),
     PrimitiveType.TUPLE: np.dtype(np.object_),
     PrimitiveType.TOKEN: np.dtype(np.object_),
+    PrimitiveType.F8E4M3FNUZ: np.dtype(float8_e4m3fnuz),
+    PrimitiveType.F8E5M2FNUZ: np.dtype(float8_e5m2fnuz),
 }
 
 # Note the conversion on the key. Numpy has a known issue wherein dtype hashing
