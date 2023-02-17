@@ -467,7 +467,7 @@ llvm::Value* EmitF8e4m3fnToF16(llvm::Value* f8_value, llvm::IRBuilder<>* b) {
   return b->CreateBitCast(f16_as_int, b->getHalfTy());
 }
 
-StatusOr<llvm::Value*> EmitF16ToF8e5m2fnuz(llvm::Value* f16_value, llvm::IRBuilder<>* b) {
+llvm::Value* EmitF16ToF8e5m2fnuz(llvm::Value* f16_value, llvm::IRBuilder<>* b) {
   llvm::Value* f16_uint = b->CreateBitCast(f16_value, b->getInt16Ty());
   llvm::Value* sign = b->CreateAnd(f16_uint, 0x8000u);
   llvm::Value* f16_uint_abs = b->CreateAnd(f16_uint, 0x7FFFu);
@@ -3185,6 +3185,10 @@ llvm_ir::ElementGenerator ElementalIrEmitter::MakeElementGenerator(
           llvm::Type* float_ir_type;
           if (component_element_type == BF16) {
             float_ir_type = llvm_ir::PrimitiveTypeToIrType(F32, module_);
+          } else if (component_element_type == F8E4M3FNUZ) {
+            float_ir_type = llvm_ir::PrimitiveTypeToIrType(F16, module_);
+          } else if (component_element_type == F8E5M2FNUZ) {
+            float_ir_type = llvm_ir::PrimitiveTypeToIrType(F16, module_);
           } else {
             float_ir_type =
                 llvm_ir::PrimitiveTypeToIrType(component_element_type, module_);
@@ -3193,6 +3197,10 @@ llvm_ir::ElementGenerator ElementalIrEmitter::MakeElementGenerator(
               b_->CreateUIToFP(elem_index_linear, float_ir_type);
           if (component_element_type == BF16) {
             TF_ASSIGN_OR_RETURN(iota_result, EmitF32ToBF16(float_val));
+          } else if (component_element_type == F8E4M3FNUZ) {
+            iota_result = EmitF16ToF8e4m3fnuz(float_val, b_);
+          } else if (component_element_type == F8E5M2FNUZ) {
+            iota_result = EmitF16ToF8e5m2fnuz(float_val, b_);
           } else {
             iota_result = float_val;
           }
